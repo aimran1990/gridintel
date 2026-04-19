@@ -45,9 +45,7 @@ const SRC_COLORS = {
   'Norton Rose Currents': { background: '#201a08', color: '#EF9F27' },
   'RTO Insider':          { background: '#0d1d30', color: '#85B7EB' },
 }
-function srcStyle(src) {
-  return SRC_COLORS[src] || { background: '#1a1a1a', color: '#666' }
-}
+function srcStyle(src) { return SRC_COLORS[src] || { background: '#1a1a1a', color: '#666' } }
 
 const S = {
   app: { background: '#0a0a0a', minHeight: '100vh' },
@@ -103,13 +101,11 @@ function Modal({ record, onClose }) {
   const f = record.fields
   const rawInsights = f['Key Insights / Arguments'] || f['Key Insights'] || ''
   const insights = typeof rawInsights === 'string' ? rawInsights.split('\n\n').filter(Boolean) : []
-
   useEffect(() => {
     const h = e => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [onClose])
-
   return (
     <div style={S.overlay} onClick={onClose}>
       <div style={S.modal} onClick={e => e.stopPropagation()}>
@@ -124,21 +120,18 @@ function Modal({ record, onClose }) {
           </div>
           <button style={S.closeBtn} onClick={onClose}>✕</button>
         </div>
-
         {f['AI Summary'] && (
           <div style={S.mSec}>
             <div style={S.mSecLabel}>Summary</div>
             <div style={S.mText}>{f['AI Summary']}</div>
           </div>
         )}
-
         {f['Why It Matters'] && (
           <div style={S.mSec}>
             <div style={S.mSecLabel}>Why it matters</div>
             <div style={S.mText}>{f['Why It Matters']}</div>
           </div>
         )}
-
         {insights.length > 0 && (
           <div style={S.mSec}>
             <div style={S.mSecLabel}>Key insights</div>
@@ -150,7 +143,6 @@ function Modal({ record, onClose }) {
             ))}
           </div>
         )}
-
         {(f['Source URL'] || f['Original Link']) && (
           <a href={f['Source URL'] || f['Original Link']} target="_blank" rel="noopener noreferrer" style={S.readLink}>
             Read original article ↗
@@ -160,6 +152,7 @@ function Modal({ record, onClose }) {
     </div>
   )
 }
+
 
 export default function App() {
   const [records, setRecords] = useState([])
@@ -202,8 +195,59 @@ export default function App() {
         <div style={S.logo}><span style={S.dot} />GridIntel</div>
         <div style={{ fontSize: 11, color: '#444' }}>{records.length} articles · {sources.length - 1} sources</div>
       </div>
-
       <div style={S.layout}>
         <div style={S.sidebar}>
           <div style={S.statsRow}>
-            <div style={S.stat}
+            <div style={S.stat}><div style={S.statN}>{records.length}</div><div style={S.statL}>Total</div></div>
+            <div style={S.stat}><div style={S.statN}>{highCount}</div><div style={S.statL}>High</div></div>
+            <div style={S.stat}><div style={S.statN}>{todayCount}</div><div style={S.statL}>Today</div></div>
+          </div>
+          <div style={S.secLabel}>Importance</div>
+          {['All', 'High', 'Medium', 'Low'].map(imp => (
+            <FilterChip key={imp} label={imp} active={filterImp === imp}
+              count={imp === 'All' ? records.length : records.filter(r => r.fields['Importance'] === imp).length}
+              onClick={() => setFilterImp(imp)} />
+          ))}
+          <div style={{ ...S.secLabel, marginTop: 14 }}>Source</div>
+          {sources.map(src => (
+            <FilterChip key={src} label={src} active={filterSrc === src}
+              count={src === 'All' ? records.length : records.filter(r => r.fields['Source'] === src).length}
+              onClick={() => setFilterSrc(src)} />
+          ))}
+          <div style={{ ...S.secLabel, marginTop: 14 }}>Topic</div>
+          {allTopics.slice(0, 20).map(t => (
+            <FilterChip key={t} label={t} active={filterTopic === t}
+              onClick={() => setFilterTopic(t)} />
+          ))}
+        </div>
+        <div style={S.feed}>
+          <input style={S.search} placeholder="Search articles…" value={search} onChange={e => setSearch(e.target.value)} />
+          {loading ? (
+            <div style={S.empty}>Loading articles…</div>
+          ) : filtered.length === 0 ? (
+            <div style={S.empty}>No articles match your filters.</div>
+          ) : filtered.map(r => {
+            const f = r.fields
+            return (
+              <div key={r.id} style={S.card} onClick={() => setSelected(r)}>
+                <div style={S.cardMeta}>
+                  <span style={{ ...S.badge, ...srcStyle(f['Source']) }}>{f['Source'] || 'Unknown'}</span>
+                  <span style={{ ...S.badge, ...impStyle(f['Importance']) }}>{f['Importance'] || '—'}</span>
+                  <span style={S.date}>{formatDate(f['Published Date'])}</span>
+                </div>
+                <div style={S.title}>{f['Title'] || 'Untitled'}</div>
+                <div style={S.summary}>{f['AI Summary'] || ''}</div>
+                {(f['Topics'] || []).length > 0 && (
+                  <div style={S.tags}>
+                    {(f['Topics'] || []).slice(0, 5).map(t => <span key={t} style={S.tag}>{t}</span>)}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+      {selected && <Modal record={selected} onClose={() => setSelected(null)} />}
+    </div>
+  )
+}
