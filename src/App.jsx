@@ -207,4 +207,141 @@ export default function App() {
   const StatCards = () => (
     <div style={{ display: 'flex', gap: 5, marginBottom: 14 }}>
       {[['Total', dateFiltered.length], ['High', highCount], ['Today', todayCount]].map(([l, n]) => (
-        
+        <div key={l} style={{ flex: 1, background: '#161616', border: '0.5px solid #2a2a2a', borderRadius: 7, padding: '6px 4px', textAlign: 'center' }}>
+          <div style={{ fontSize: mobile ? 15 : 17, fontWeight: 500, color: '#fff' }}>{n}</div>
+          <div style={{ fontSize: 9, color: '#666', marginTop: 1 }}>{l}</div>
+        </div>
+      ))}
+    </div>
+  )
+
+  const Sidebar = () => (
+    <div style={{ padding: mobile ? '12px 16px' : '14px 10px' }}>
+      {!mobile && <StatCards />}
+
+      <div style={{ marginBottom: 14 }}>
+        <div style={sl1}>Date range</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {DATE_RANGES.map(r => (
+            <div key={r} onClick={() => setDateRange(r)}
+              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', border: '0.5px solid', borderColor: dateRange === r ? '#1D9E75' : '#2a2a2a', background: dateRange === r ? '#0a2218' : '#161616', color: dateRange === r ? '#6ddbb0' : '#aaa' }}>
+              {r}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={sl1}>Importance</div>
+      {['All', 'High', 'Medium', 'Low'].map(imp => (
+        <Chip key={imp} label={imp} active={filterImp === imp}
+          count={imp === 'All' ? dateFiltered.length : dateFiltered.filter(r => r.fields['Importance'] === imp).length}
+          onClick={() => setFilterImp(imp)} />
+      ))}
+
+      <div style={{ ...sl1, marginTop: 14 }}>Source</div>
+      {sources.map(src => (
+        <Chip key={src} label={src} active={filterSrc === src}
+          count={src === 'All' ? dateFiltered.length : dateFiltered.filter(r => r.fields['Source'] === src).length}
+          onClick={() => { setFilterSrc(src); if (mobile) setShowFilters(false) }} />
+      ))}
+
+      <div style={{ ...sl1, marginTop: 14 }}>Topic</div>
+      {allTopics.slice(0, 20).map(t => (
+        <Chip key={t} label={t} active={filterTopic === t}
+          onClick={() => { setFilterTopic(t); if (mobile) setShowFilters(false) }} />
+      ))}
+    </div>
+  )
+
+  return (
+    <div style={{ background: '#0a0a0a', minHeight: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+
+      <div style={{ background: '#0f0f0f', borderBottom: '0.5px solid #2a2a2a', padding: '11px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 20 }}>
+        <div style={{ fontSize: 15, fontWeight: 500, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#1D9E75', display: 'inline-block' }} />
+          GridIntel
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {mobile && (
+            <button onClick={() => setShowFilters(!showFilters)}
+              style={{ background: showFilters ? '#1e1e1e' : 'none', border: '0.5px solid #2a2a2a', borderRadius: 6, color: '#aaa', fontSize: 11, padding: '5px 10px', cursor: 'pointer' }}>
+              {showFilters ? '✕ Close' : '⚙ Filters'}
+            </button>
+          )}
+          <div style={{ fontSize: 11, color: '#666' }}>{dateFiltered.length} articles</div>
+        </div>
+      </div>
+
+      {mobile && showFilters && (
+        <div style={{ background: '#0f0f0f', borderBottom: '0.5px solid #2a2a2a', maxHeight: '75vh', overflowY: 'auto' }}>
+          <Sidebar />
+        </div>
+      )}
+
+      <div style={{ display: 'flex', maxWidth: 1200, margin: '0 auto' }}>
+        {!mobile && (
+          <div style={{ width: 210, borderRight: '0.5px solid #2a2a2a', flexShrink: 0, position: 'sticky', top: 45, height: 'calc(100vh - 45px)', overflowY: 'auto' }}>
+            <Sidebar />
+          </div>
+        )}
+
+        <div style={{ flex: 1, padding: mobile ? '12px' : '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+          <input
+            style={{ background: '#161616', border: '0.5px solid #2a2a2a', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#fff', width: '100%', outline: 'none' }}
+            placeholder="Search articles…" value={search} onChange={e => setSearch(e.target.value)} />
+
+          {mobile && <StatCards />}
+
+          <div style={{ display: 'flex', gap: 2 }}>
+            {['all', 'saved'].map(t => (
+              <div key={t} onClick={() => setTab(t)}
+                style={{ fontSize: 11, padding: '5px 12px', borderRadius: 6, cursor: 'pointer', color: tab === t ? '#fff' : '#888', background: tab === t ? '#1e1e1e' : 'none', border: `0.5px solid ${tab === t ? '#2a2a2a' : 'transparent'}` }}>
+                {t === 'all' ? `All articles` : `Saved${savedCount > 0 ? ` (${savedCount})` : ''}`}
+              </div>
+            ))}
+          </div>
+
+          {loading ? (
+            <div style={{ color: '#555', textAlign: 'center', padding: '60px 0', fontSize: 13 }}>Loading articles…</div>
+          ) : filtered.length === 0 ? (
+            <div style={{ color: '#555', textAlign: 'center', padding: '60px 0', fontSize: 13 }}>
+              {tab === 'saved' ? 'No saved articles yet.' : 'No articles match your filters.'}
+            </div>
+          ) : filtered.map(r => {
+            const f = r.fields
+            const saved = !!f['Saved']
+            return (
+              <div key={r.id} onClick={() => setSelected(r)}
+                style={{ background: '#111', border: '0.5px solid #2a2a2a', borderRadius: 10, padding: '12px 14px', cursor: 'pointer', position: 'relative' }}>
+                <button onClick={e => { e.stopPropagation(); handleToggleSave(r.id, saved) }}
+                  style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: saved ? '#ffc04d' : '#444', padding: 2 }}>
+                  {saved ? '★' : '☆'}
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6, flexWrap: 'wrap', paddingRight: 28 }}>
+                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 500, ...srcStyle(f['Source']) }}>{f['Source'] || 'Unknown'}</span>
+                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 500, ...impStyle(f['Importance']) }}>{f['Importance'] || '—'}</span>
+                  <span style={{ fontSize: 10, color: '#666', marginLeft: 'auto' }}>{formatDate(f['Published Date'])}</span>
+                </div>
+                <div style={{ fontSize: mobile ? 14 : 13, fontWeight: 500, color: '#f0f0f0', lineHeight: 1.4, marginBottom: 5 }}>{f['Title'] || 'Untitled'}</div>
+                <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{f['AI Summary'] || ''}</div>
+                {(f['Topics'] || []).length > 0 && (
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
+                    {(f['Topics'] || []).slice(0, mobile ? 3 : 5).map(t => (
+                      <span key={t} style={{ fontSize: 9, padding: '2px 7px', borderRadius: 20, background: '#1e1e1e', color: '#999', border: '0.5px solid #2a2a2a' }}>{t}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {selected && <Modal record={selected} onClose={() => setSelected(null)} onToggleSave={handleToggleSave} mobile={mobile} />}
+    </div>
+  )
+}
+
+const sl1 = { fontSize: 9, fontWeight: 500, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }
+const sl2 = { fontSize: 9, fontWeight: 500, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }
