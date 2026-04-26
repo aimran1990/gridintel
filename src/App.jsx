@@ -15,6 +15,18 @@ async function fetchAll() {
   return records
 }
 
+async function fetchEarnings() {
+  let records = [], offset = null
+  do {
+    const url = `https://api.airtable.com/v0/${BASE}/Earnings?pageSize=100${offset ? `&offset=${offset}` : ''}&sort[0][field]=Filing%20Date&sort[0][direction]=desc`
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` } })
+    const data = await res.json()
+    records = [...records, ...(data.records || [])]
+    offset = data.offset
+  } while (offset)
+  return records
+}
+
 async function toggleSaved(id, current) {
   await fetch(`https://api.airtable.com/v0/${BASE}/Feed%20Items/${id}`, {
     method: 'PATCH',
@@ -52,7 +64,7 @@ const SRC_COLORS = {
   'Canary Media':         { background: '#0a2218', color: '#6ddbb0' },
   'Norton Rose Currents': { background: '#2a1f00', color: '#ffc04d' },
   'RTO Insider':          { background: '#0d1f35', color: '#90c8ff' },
-  'Brattle Group':        { background: '#1e1a3a', color: '#c4bcf5' },
+  'Axios Energy':         { background: '#1e1a3a', color: '#c4bcf5' },
 }
 function srcStyle(src) { return SRC_COLORS[src] || { background: '#1e1e1e', color: '#aaa' } }
 
@@ -82,12 +94,12 @@ function Section({ label, text }) {
   return (
     <div style={{ borderTop: '0.5px solid #222', paddingTop: 13, marginBottom: 14 }}>
       <div style={sl2}>{label}</div>
-      <div style={{ fontSize: 12, color: '#bbb', lineHeight: 1.7 }}>{text}</div>
+      <div style={{ fontSize: 12, color: '#bbb', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{text}</div>
     </div>
   )
 }
 
-function Modal({ record, onClose, onToggleSave, mobile }) {
+function NewsModal({ record, onClose, onToggleSave, mobile }) {
   const f = record.fields
   const rawInsights = f['Key Insights / Arguments'] || f['Key Insights'] || ''
   const insights = typeof rawInsights === 'string' ? rawInsights.split('\n\n').filter(Boolean) : []
@@ -102,7 +114,6 @@ function Modal({ record, onClose, onToggleSave, mobile }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: mobile ? 'flex-end' : 'center', justifyContent: 'center', zIndex: 100, padding: mobile ? 0 : 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: '#141414', border: '0.5px solid #2a2a2a', borderRadius: mobile ? '14px 14px 0 0' : 14, width: '100%', maxWidth: mobile ? '100%' : 660, maxHeight: '88vh', overflowY: 'auto', padding: mobile ? '20px 16px' : '22px 26px' }}>
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{f['Source']} · {formatDate(f['Published Date'])}</div>
@@ -116,10 +127,8 @@ function Modal({ record, onClose, onToggleSave, mobile }) {
           </div>
           <button onClick={onClose} style={{ background: '#1e1e1e', border: '0.5px solid #2a2a2a', borderRadius: 6, color: '#aaa', fontSize: 12, cursor: 'pointer', padding: '4px 10px', flexShrink: 0 }}>✕</button>
         </div>
-
         {f['AI Summary'] && <Section label="Summary" text={f['AI Summary']} />}
         {f['Why It Matters'] && <Section label="Why it matters" text={f['Why It Matters']} />}
-
         {insights.length > 0 && (
           <div style={{ borderTop: '0.5px solid #222', paddingTop: 13, marginBottom: 14 }}>
             <div style={sl2}>Key insights</div>
@@ -131,7 +140,6 @@ function Modal({ record, onClose, onToggleSave, mobile }) {
             ))}
           </div>
         )}
-
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '0.5px solid #222', paddingTop: 12 }}>
           {(f['Source URL'] || f['Original Link'])
             ? <a href={f['Source URL'] || f['Original Link']} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#5DCAA5', textDecoration: 'none' }}>Read original ↗</a>
@@ -146,21 +154,60 @@ function Modal({ record, onClose, onToggleSave, mobile }) {
   )
 }
 
+function EarningsModal({ record, onClose, mobile }) {
+  const f = record.fields
+
+  useEffect(() => {
+    const h = e => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [onClose])
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: mobile ? 'flex-end' : 'center', justifyContent: 'center', zIndex: 100, padding: mobile ? 0 : 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#141414', border: '0.5px solid #2a2a2a', borderRadius: mobile ? '14px 14px 0 0' : 14, width: '100%', maxWidth: mobile ? '100%' : 720, maxHeight: '88vh', overflowY: 'auto', padding: mobile ? '20px 16px' : '22px 26px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{f['Filing Type']} · {f['Filing Date']}</div>
+            <div style={{ fontSize: 18, fontWeight: 600, color: '#f0f0f0', lineHeight: 1.3, marginBottom: 6 }}>{f['Company']}</div>
+            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#1e1a3a', color: '#c4bcf5', fontWeight: 500 }}>{f['Ticker']}</span>
+          </div>
+          <button onClick={onClose} style={{ background: '#1e1e1e', border: '0.5px solid #2a2a2a', borderRadius: 6, color: '#aaa', fontSize: 12, cursor: 'pointer', padding: '4px 10px', flexShrink: 0 }}>✕</button>
+        </div>
+        {f['Summary'] && <Section label="Summary" text={f['Summary']} />}
+        {f['Key Performance Highlights'] && <Section label="Key Performance Highlights" text={f['Key Performance Highlights']} />}
+        {f['Outlook'] && <Section label="Outlook & Q&A Insights" text={f['Outlook']} />}
+        <div style={{ borderTop: '0.5px solid #222', paddingTop: 12, marginTop: 4 }}>
+          {f['Filing URL']
+            ? <a href={f['Filing URL']} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#5DCAA5', textDecoration: 'none' }}>View full transcript ↗</a>
+            : <span />}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const [records, setRecords] = useState([])
+  const [earnings, setEarnings] = useState([])
   const [loading, setLoading] = useState(true)
+  const [earningsLoading, setEarningsLoading] = useState(true)
   const [selected, setSelected] = useState(null)
+  const [selectedEarnings, setSelectedEarnings] = useState(null)
   const [search, setSearch] = useState('')
+  const [earningsSearch, setEarningsSearch] = useState('')
   const [filterImp, setFilterImp] = useState('All')
   const [filterSrc, setFilterSrc] = useState('All')
   const [filterTopic, setFilterTopic] = useState('All')
   const [dateRange, setDateRange] = useState('All time')
   const [tab, setTab] = useState('all')
+  const [mainTab, setMainTab] = useState('news')
   const [showFilters, setShowFilters] = useState(false)
   const [mobile, setMobile] = useState(isMobile())
 
   useEffect(() => {
     fetchAll().then(r => { setRecords(r); setLoading(false) }).catch(() => setLoading(false))
+    fetchEarnings().then(r => { setEarnings(r); setEarningsLoading(false) }).catch(() => setEarningsLoading(false))
     const handleResize = () => setMobile(isMobile())
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
@@ -173,14 +220,11 @@ export default function App() {
   }
 
   const cutoff = getDateCutoff(dateRange)
-
-  // All records filtered by date only — used for counts
   const dateFiltered = records.filter(r => {
     const pub = r.fields['Published Date'] ? new Date(r.fields['Published Date']) : null
     return !cutoff || (pub && pub >= cutoff)
   })
 
-  // Stats — all update with date filter
   const savedCount = records.filter(r => r.fields['Saved']).length
   const highCount = dateFiltered.filter(r => r.fields['Importance'] === 'High').length
   const todayStart = new Date(); todayStart.setHours(0,0,0,0)
@@ -189,7 +233,6 @@ export default function App() {
   const sources = ['All', ...new Set(records.map(r => r.fields['Source']).filter(Boolean))]
   const allTopics = ['All', ...new Set(records.flatMap(r => r.fields['Topics'] || []))]
 
-  // Full filtered feed
   const base = tab === 'saved' ? records.filter(r => r.fields['Saved']) : records
   const filtered = base.filter(r => {
     const f = r.fields
@@ -202,6 +245,14 @@ export default function App() {
       (!search || (f['Title'] || '').toLowerCase().includes(search.toLowerCase()) ||
         (f['AI Summary'] || '').toLowerCase().includes(search.toLowerCase()))
     )
+  })
+
+  const filteredEarnings = earnings.filter(r => {
+    const f = r.fields
+    return !earningsSearch ||
+      (f['Company'] || '').toLowerCase().includes(earningsSearch.toLowerCase()) ||
+      (f['Ticker'] || '').toLowerCase().includes(earningsSearch.toLowerCase()) ||
+      (f['Filing Type'] || '').toLowerCase().includes(earningsSearch.toLowerCase())
   })
 
   const StatCards = () => (
@@ -218,7 +269,6 @@ export default function App() {
   const Sidebar = () => (
     <div style={{ padding: mobile ? '12px 16px' : '14px 10px' }}>
       {!mobile && <StatCards />}
-
       <div style={{ marginBottom: 14 }}>
         <div style={sl1}>Date range</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -230,21 +280,18 @@ export default function App() {
           ))}
         </div>
       </div>
-
       <div style={sl1}>Importance</div>
       {['All', 'High', 'Medium', 'Low'].map(imp => (
         <Chip key={imp} label={imp} active={filterImp === imp}
           count={imp === 'All' ? dateFiltered.length : dateFiltered.filter(r => r.fields['Importance'] === imp).length}
           onClick={() => setFilterImp(imp)} />
       ))}
-
       <div style={{ ...sl1, marginTop: 14 }}>Source</div>
       {sources.map(src => (
         <Chip key={src} label={src} active={filterSrc === src}
           count={src === 'All' ? dateFiltered.length : dateFiltered.filter(r => r.fields['Source'] === src).length}
           onClick={() => { setFilterSrc(src); if (mobile) setShowFilters(false) }} />
       ))}
-
       <div style={{ ...sl1, marginTop: 14 }}>Topic</div>
       {allTopics.slice(0, 20).map(t => (
         <Chip key={t} label={t} active={filterTopic === t}
@@ -255,90 +302,134 @@ export default function App() {
 
   return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-
       <div style={{ background: '#0f0f0f', borderBottom: '0.5px solid #2a2a2a', padding: '11px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 20 }}>
-        <div style={{ fontSize: 15, fontWeight: 500, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#1D9E75', display: 'inline-block' }} />
-          GridIntel
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 500, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#1D9E75', display: 'inline-block' }} />
+            GridIntel
+          </div>
+          <div style={{ display: 'flex', gap: 2 }}>
+            {['news', 'earnings'].map(t => (
+              <div key={t} onClick={() => setMainTab(t)}
+                style={{ fontSize: 11, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', color: mainTab === t ? '#fff' : '#555', background: mainTab === t ? '#1e1e1e' : 'none', border: `0.5px solid ${mainTab === t ? '#2a2a2a' : 'transparent'}`, textTransform: 'capitalize' }}>
+                {t === 'earnings' ? `Earnings${earnings.length > 0 ? ` (${earnings.length})` : ''}` : 'News'}
+              </div>
+            ))}
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {mobile && (
+          {mobile && mainTab === 'news' && (
             <button onClick={() => setShowFilters(!showFilters)}
               style={{ background: showFilters ? '#1e1e1e' : 'none', border: '0.5px solid #2a2a2a', borderRadius: 6, color: '#aaa', fontSize: 11, padding: '5px 10px', cursor: 'pointer' }}>
               {showFilters ? '✕ Close' : '⚙ Filters'}
             </button>
           )}
-          <div style={{ fontSize: 11, color: '#666' }}>{dateFiltered.length} articles</div>
+          <div style={{ fontSize: 11, color: '#555' }}>
+            {mainTab === 'news' ? `${dateFiltered.length} articles` : `${earnings.length} filings`}
+          </div>
         </div>
       </div>
 
-      {mobile && showFilters && (
+      {mainTab === 'news' && mobile && showFilters && (
         <div style={{ background: '#0f0f0f', borderBottom: '0.5px solid #2a2a2a', maxHeight: '75vh', overflowY: 'auto' }}>
           <Sidebar />
         </div>
       )}
 
-      <div style={{ display: 'flex', maxWidth: 1200, margin: '0 auto' }}>
-        {!mobile && (
-          <div style={{ width: 210, borderRight: '0.5px solid #2a2a2a', flexShrink: 0, position: 'sticky', top: 45, height: 'calc(100vh - 45px)', overflowY: 'auto' }}>
-            <Sidebar />
-          </div>
-        )}
-
-        <div style={{ flex: 1, padding: mobile ? '12px' : '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-
-          <input
-            style={{ background: '#161616', border: '0.5px solid #2a2a2a', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#fff', width: '100%', outline: 'none' }}
-            placeholder="Search articles…" value={search} onChange={e => setSearch(e.target.value)} />
-
-          {mobile && <StatCards />}
-
-          <div style={{ display: 'flex', gap: 2 }}>
-            {['all', 'saved'].map(t => (
-              <div key={t} onClick={() => setTab(t)}
-                style={{ fontSize: 11, padding: '5px 12px', borderRadius: 6, cursor: 'pointer', color: tab === t ? '#fff' : '#888', background: tab === t ? '#1e1e1e' : 'none', border: `0.5px solid ${tab === t ? '#2a2a2a' : 'transparent'}` }}>
-                {t === 'all' ? `All articles` : `Saved${savedCount > 0 ? ` (${savedCount})` : ''}`}
-              </div>
-            ))}
-          </div>
-
-          {loading ? (
-            <div style={{ color: '#555', textAlign: 'center', padding: '60px 0', fontSize: 13 }}>Loading articles…</div>
-          ) : filtered.length === 0 ? (
-            <div style={{ color: '#555', textAlign: 'center', padding: '60px 0', fontSize: 13 }}>
-              {tab === 'saved' ? 'No saved articles yet.' : 'No articles match your filters.'}
+      {mainTab === 'news' && (
+        <div style={{ display: 'flex', maxWidth: 1200, margin: '0 auto' }}>
+          {!mobile && (
+            <div style={{ width: 210, borderRight: '0.5px solid #2a2a2a', flexShrink: 0, position: 'sticky', top: 45, height: 'calc(100vh - 45px)', overflowY: 'auto' }}>
+              <Sidebar />
             </div>
-          ) : filtered.map(r => {
-            const f = r.fields
-            const saved = !!f['Saved']
-            return (
-              <div key={r.id} onClick={() => setSelected(r)}
-                style={{ background: '#111', border: '0.5px solid #2a2a2a', borderRadius: 10, padding: '12px 14px', cursor: 'pointer', position: 'relative' }}>
-                <button onClick={e => { e.stopPropagation(); handleToggleSave(r.id, saved) }}
-                  style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: saved ? '#ffc04d' : '#444', padding: 2 }}>
-                  {saved ? '★' : '☆'}
-                </button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6, flexWrap: 'wrap', paddingRight: 28 }}>
-                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 500, ...srcStyle(f['Source']) }}>{f['Source'] || 'Unknown'}</span>
-                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 500, ...impStyle(f['Importance']) }}>{f['Importance'] || '—'}</span>
-                  <span style={{ fontSize: 10, color: '#666', marginLeft: 'auto' }}>{formatDate(f['Published Date'])}</span>
+          )}
+          <div style={{ flex: 1, padding: mobile ? '12px' : '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input style={{ background: '#161616', border: '0.5px solid #2a2a2a', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#fff', width: '100%', outline: 'none' }}
+              placeholder="Search articles…" value={search} onChange={e => setSearch(e.target.value)} />
+            {mobile && <StatCards />}
+            <div style={{ display: 'flex', gap: 2 }}>
+              {['all', 'saved'].map(t => (
+                <div key={t} onClick={() => setTab(t)}
+                  style={{ fontSize: 11, padding: '5px 12px', borderRadius: 6, cursor: 'pointer', color: tab === t ? '#fff' : '#888', background: tab === t ? '#1e1e1e' : 'none', border: `0.5px solid ${tab === t ? '#2a2a2a' : 'transparent'}` }}>
+                  {t === 'all' ? 'All articles' : `Saved${savedCount > 0 ? ` (${savedCount})` : ''}`}
                 </div>
-                <div style={{ fontSize: mobile ? 14 : 13, fontWeight: 500, color: '#f0f0f0', lineHeight: 1.4, marginBottom: 5 }}>{f['Title'] || 'Untitled'}</div>
-                <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{f['AI Summary'] || ''}</div>
-                {(f['Topics'] || []).length > 0 && (
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
-                    {(f['Topics'] || []).slice(0, mobile ? 3 : 5).map(t => (
-                      <span key={t} style={{ fontSize: 9, padding: '2px 7px', borderRadius: 20, background: '#1e1e1e', color: '#999', border: '0.5px solid #2a2a2a' }}>{t}</span>
-                    ))}
-                  </div>
-                )}
+              ))}
+            </div>
+            {loading ? (
+              <div style={{ color: '#555', textAlign: 'center', padding: '60px 0', fontSize: 13 }}>Loading articles…</div>
+            ) : filtered.length === 0 ? (
+              <div style={{ color: '#555', textAlign: 'center', padding: '60px 0', fontSize: 13 }}>
+                {tab === 'saved' ? 'No saved articles yet.' : 'No articles match your filters.'}
               </div>
-            )
-          })}
+            ) : filtered.map(r => {
+              const f = r.fields
+              const saved = !!f['Saved']
+              return (
+                <div key={r.id} onClick={() => setSelected(r)}
+                  style={{ background: '#111', border: '0.5px solid #2a2a2a', borderRadius: 10, padding: '12px 14px', cursor: 'pointer', position: 'relative' }}>
+                  <button onClick={e => { e.stopPropagation(); handleToggleSave(r.id, saved) }}
+                    style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: saved ? '#ffc04d' : '#444', padding: 2 }}>
+                    {saved ? '★' : '☆'}
+                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6, flexWrap: 'wrap', paddingRight: 28 }}>
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 500, ...srcStyle(f['Source']) }}>{f['Source'] || 'Unknown'}</span>
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 500, ...impStyle(f['Importance']) }}>{f['Importance'] || '—'}</span>
+                    <span style={{ fontSize: 10, color: '#555', marginLeft: 'auto' }}>{formatDate(f['Published Date'])}</span>
+                  </div>
+                  <div style={{ fontSize: mobile ? 14 : 13, fontWeight: 500, color: '#f0f0f0', lineHeight: 1.4, marginBottom: 5 }}>{f['Title'] || 'Untitled'}</div>
+                  <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{f['AI Summary'] || ''}</div>
+                  {(f['Topics'] || []).length > 0 && (
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
+                      {(f['Topics'] || []).slice(0, mobile ? 3 : 5).map(t => (
+                        <span key={t} style={{ fontSize: 9, padding: '2px 7px', borderRadius: 20, background: '#1e1e1e', color: '#999', border: '0.5px solid #2a2a2a' }}>{t}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
-      {selected && <Modal record={selected} onClose={() => setSelected(null)} onToggleSave={handleToggleSave} mobile={mobile} />}
+      {mainTab === 'earnings' && (
+        <div style={{ maxWidth: 1000, margin: '0 auto', padding: mobile ? '12px' : '20px 16px' }}>
+          <input style={{ background: '#161616', border: '0.5px solid #2a2a2a', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#fff', width: '100%', outline: 'none', marginBottom: 16 }}
+            placeholder="Search by company, ticker or quarter…" value={earningsSearch} onChange={e => setEarningsSearch(e.target.value)} />
+          {earningsLoading ? (
+            <div style={{ color: '#555', textAlign: 'center', padding: '60px 0', fontSize: 13 }}>Loading earnings…</div>
+          ) : filteredEarnings.length === 0 ? (
+            <div style={{ color: '#555', textAlign: 'center', padding: '60px 0', fontSize: 13 }}>No earnings filings yet.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {filteredEarnings.map(r => {
+                const f = r.fields
+                return (
+                  <div key={r.id} onClick={() => setSelectedEarnings(r)}
+                    style={{ background: '#111', border: '0.5px solid #2a2a2a', borderRadius: 10, padding: '14px 16px', cursor: 'pointer' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: '#f0f0f0', marginBottom: 5 }}>{f['Company']}</div>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#1e1a3a', color: '#c4bcf5', fontWeight: 500 }}>{f['Ticker']}</span>
+                          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#0a2218', color: '#6ddbb0', fontWeight: 500 }}>{f['Filing Type']}</span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#555', flexShrink: 0 }}>{f['Filing Date']}</div>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {f['Summary'] || f['Key Performance Highlights'] || ''}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {selected && <NewsModal record={selected} onClose={() => setSelected(null)} onToggleSave={handleToggleSave} mobile={mobile} />}
+      {selectedEarnings && <EarningsModal record={selectedEarnings} onClose={() => setSelectedEarnings(null)} mobile={mobile} />}
     </div>
   )
 }
