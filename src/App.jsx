@@ -322,8 +322,9 @@ export default function App() {
                 padding: '7px 20px',
                 borderRadius: 8,
                 cursor: 'pointer',
-                color: mainTab === t ? '#fff' : '#666',
+                color: mainTab === t ? '#6ddbb0' : '#666',
                 background: mainTab === t ? '#2a2a2a' : 'none',
+                borderBottom: mainTab === t ? '2px solid #1D9E75' : '2px solid transparent',
                 letterSpacing: '0.01em',
                 transition: 'all 0.15s'
               }}>
