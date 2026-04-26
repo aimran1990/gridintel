@@ -300,53 +300,64 @@ export default function App() {
     </div>
   )
 
+  const TabSwitcher = () => (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: mobile ? '0 16px 10px' : '0' }}>
+      <div style={{ display: 'flex', gap: 2, background: '#161616', borderRadius: 10, padding: '3px', border: '0.5px solid #2a2a2a' }}>
+        {['news', 'earnings'].map(t => (
+          <div key={t} onClick={() => setMainTab(t)}
+            style={{
+              fontSize: mobile ? 14 : 13,
+              fontWeight: mainTab === t ? 700 : 400,
+              padding: mobile ? '9px 32px' : '7px 24px',
+              borderRadius: 8,
+              cursor: 'pointer',
+              color: mainTab === t ? '#ff6b6b' : '#555',
+              background: mainTab === t ? '#2a1515' : 'none',
+              borderBottom: mainTab === t ? '2px solid #cc3333' : '2px solid transparent',
+              letterSpacing: '0.01em',
+              transition: 'all 0.15s',
+              whiteSpace: 'nowrap',
+            }}>
+            {t === 'earnings'
+              ? `Earnings${earnings.length > 0 ? ` (${earnings.length})` : ''}`
+              : 'News'}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
   return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
       {/* TOPBAR */}
-      <div style={{ background: '#0f0f0f', borderBottom: '0.5px solid #2a2a2a', padding: '10px 16px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', position: 'sticky', top: 0, zIndex: 20 }}>
+      <div style={{ background: '#0f0f0f', borderBottom: '0.5px solid #2a2a2a', position: 'sticky', top: 0, zIndex: 20 }}>
 
-        {/* Left — Logo */}
-        <div style={{ fontSize: 15, fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#1D9E75', display: 'inline-block' }} />
-          GridIntel
-        </div>
+        {/* Top row */}
+        <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#1D9E75', display: 'inline-block' }} />
+            GridIntel
+          </div>
 
-        {/* Center — Tab switcher */}
-        <div style={{ display: 'flex', gap: 2, background: '#161616', borderRadius: 10, padding: '3px', border: '0.5px solid #2a2a2a' }}>
-          {['news', 'earnings'].map(t => (
-            <div key={t} onClick={() => setMainTab(t)}
-              style={{
-                fontSize: 13,
-                fontWeight: mainTab === t ? 600 : 400,
-                padding: '7px 20px',
-                borderRadius: 8,
-                cursor: 'pointer',
-                color: mainTab === t ? '#6ddbb0' : '#666',
-                background: mainTab === t ? '#2a2a2a' : 'none',
-                borderBottom: mainTab === t ? '2px solid #1D9E75' : '2px solid transparent',
-                letterSpacing: '0.01em',
-                transition: 'all 0.15s'
-              }}>
-              {t === 'earnings'
-                ? `Earnings${earnings.length > 0 ? ` (${earnings.length})` : ''}`
-                : 'News'}
+          {/* Desktop tabs inline */}
+          {!mobile && <TabSwitcher />}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {mobile && mainTab === 'news' && (
+              <button onClick={() => setShowFilters(!showFilters)}
+                style={{ background: showFilters ? '#1e1e1e' : 'none', border: '0.5px solid #2a2a2a', borderRadius: 6, color: '#aaa', fontSize: 11, padding: '5px 10px', cursor: 'pointer' }}>
+                {showFilters ? '✕' : '⚙ Filters'}
+              </button>
+            )}
+            <div style={{ fontSize: 11, color: '#444' }}>
+              {mainTab === 'news' ? `${dateFiltered.length} articles` : `${earnings.length} filings`}
             </div>
-          ))}
-        </div>
-
-        {/* Right — Meta + mobile filter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end' }}>
-          {mobile && mainTab === 'news' && (
-            <button onClick={() => setShowFilters(!showFilters)}
-              style={{ background: showFilters ? '#1e1e1e' : 'none', border: '0.5px solid #2a2a2a', borderRadius: 6, color: '#aaa', fontSize: 11, padding: '5px 10px', cursor: 'pointer' }}>
-              {showFilters ? '✕ Close' : '⚙ Filters'}
-            </button>
-          )}
-          <div style={{ fontSize: 11, color: '#444' }}>
-            {mainTab === 'news' ? `${dateFiltered.length} articles` : `${earnings.length} filings`}
           </div>
         </div>
+
+        {/* Mobile tabs on separate row */}
+        {mobile && <TabSwitcher />}
       </div>
 
       {mainTab === 'news' && mobile && showFilters && (
@@ -358,7 +369,7 @@ export default function App() {
       {mainTab === 'news' && (
         <div style={{ display: 'flex', maxWidth: 1200, margin: '0 auto' }}>
           {!mobile && (
-            <div style={{ width: 210, borderRight: '0.5px solid #2a2a2a', flexShrink: 0, position: 'sticky', top: 45, height: 'calc(100vh - 45px)', overflowY: 'auto' }}>
+            <div style={{ width: 210, borderRight: '0.5px solid #2a2a2a', flexShrink: 0, position: 'sticky', top: 77, height: 'calc(100vh - 77px)', overflowY: 'auto' }}>
               <Sidebar />
             </div>
           )}
