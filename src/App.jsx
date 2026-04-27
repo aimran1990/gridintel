@@ -64,6 +64,7 @@ const SRC_COLORS = {
   'Canary Media':         { background: '#0a2218', color: '#6ddbb0' },
   'Norton Rose Currents': { background: '#2a1f00', color: '#ffc04d' },
   'RTO Insider':          { background: '#0d1f35', color: '#90c8ff' },
+  'Bloomberg Green': { background: '#0a2a1a', color: '#4dff9a' },
   'Axios Energy':         { background: '#1e1a3a', color: '#c4bcf5' },
 }
 function srcStyle(src) { return SRC_COLORS[src] || { background: '#1e1e1e', color: '#aaa' } }
