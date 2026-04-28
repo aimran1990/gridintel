@@ -448,8 +448,8 @@ export default function App() {
                       border: `0.5px solid ${isToday ? '#1D9E75' : isPast ? '#1e1e1e' : '#2a2a2a'}`,
                       borderRadius: 10,
                       padding: '10px 14px',
-                      minWidth: mobile ? '42%' : 160,
-                      flex: '1 1 140px',
+                      width: mobile ? 'calc(50% - 4px)' : 160,
+flex: '0 0 auto',
                       opacity: isPast ? 0.5 : 1,
                     }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#f0f0f0', marginBottom: 3 }}>{f['Company']}</div>
