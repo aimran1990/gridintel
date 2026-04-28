@@ -445,16 +445,16 @@ export default function App() {
                   return (
                     <div key={r.id} style={{
                       background: isPast ? '#0f0f0f' : isToday ? '#0a2218' : '#111',
-                      border: `0.5px solid ${isToday ? '#1D9E75' : isPast ? '#1e1e1e' : '#2a2a2a'}`,
-                      borderRadius: 10,
-                      padding: '10px 14px',
-                      width: mobile ? 'calc(50% - 4px)' : 160,
+border: `0.5px solid ${isToday ? '#1D9E75' : isPast ? '#1e1e1e' : '#2a2a2a'}`,
+borderRadius: 8,
+padding: '7px 10px',
+width: mobile ? 'calc(33% - 6px)' : 130,
 flex: '0 0 auto',
-                      opacity: isPast ? 0.5 : 1,
+opacity: isPast ? 0.5 : 1,
                     }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#f0f0f0', marginBottom: 3 }}>{f['Company']}</div>
-                      <div style={{ fontSize: 10, color: '#888', marginBottom: 6 }}>{f['Ticker']}</div>
-                      <div style={{ fontSize: 11, color: isToday ? '#6ddbb0' : isPast ? '#555' : '#aaa', fontWeight: isToday ? 600 : 400 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#f0f0f0', marginBottom: 2 }}>{f['Company']}</div>
+<div style={{ fontSize: 9, color: '#888', marginBottom: 4 }}>{f['Ticker']}</div>
+<div style={{ fontSize: 10, color: isToday ? '#6ddbb0' : isPast ? '#555' : '#aaa', fontWeight: isToday ? 600 : 400 }}>
                         {date ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                         {isToday && <span style={{ marginLeft: 5, fontSize: 9, background: '#1D9E75', color: '#000', borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>TODAY</span>}
                         {isPast && <span style={{ marginLeft: 5, fontSize: 9, color: '#555' }}>reported</span>}
