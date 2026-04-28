@@ -72,6 +72,7 @@ const SRC_COLORS = {
   'Norton Rose Currents': { background: '#2a1f00', color: '#ffc04d' },
   'RTO Insider':          { background: '#0d1f35', color: '#90c8ff' },
   'Bloomberg Green':      { background: '#0a2a1a', color: '#4dff9a' },
+  'Energy Monitor': { background: '#0d2a1f', color: '#4dffaa' },
   'Axios Energy':         { background: '#1e1a3a', color: '#c4bcf5' },
 }
 function srcStyle(src) { return SRC_COLORS[src] || { background: '#1e1e1e', color: '#aaa' } }
