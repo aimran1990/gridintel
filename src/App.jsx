@@ -28,10 +28,15 @@ async function fetchEarnings() {
 }
 
 async function fetchEarningsCalendar() {
-  const url = `https://api.airtable.com/v0/${BASE}/Earnings%20Calendar?pageSize=100&sort[0][field]=Earnings%20Date&sort[0][direction]=asc`
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` } })
-  const data = await res.json()
-  return data.records || []
+  let records = [], offset = null
+  do {
+    const url = `https://api.airtable.com/v0/${BASE}/Earnings%20Calendar?pageSize=100${offset ? `&offset=${offset}` : ''}&sort[0][field]=Earnings%20Date&sort[0][direction]=asc`
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` } })
+    const data = await res.json()
+    records = [...records, ...(data.records || [])]
+    offset = data.offset
+  } while (offset)
+  return records
 }
 
 async function toggleSaved(id, current) {
@@ -49,6 +54,23 @@ function formatDate(str) {
   if (d.toDateString() === today.toDateString())
     return `Today ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function formatEarningsDate(str) {
+  if (!str) return ''
+  const d = new Date(str)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function stripMarkdown(text) {
+  if (!text) return ''
+  return text
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/^[-*]\s+/gm, '• ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function impStyle(imp) {
@@ -71,9 +93,10 @@ const SRC_COLORS = {
   'Canary Media':         { background: '#0a2218', color: '#6ddbb0' },
   'Norton Rose Currents': { background: '#2a1f00', color: '#ffc04d' },
   'RTO Insider':          { background: '#0d1f35', color: '#90c8ff' },
-  'Bloomberg Green':      { background: '#0a2a1a', color: '#4dff9a' },
-  'Energy Monitor': { background: '#0d2a1f', color: '#4dffaa' },
   'Axios Energy':         { background: '#1e1a3a', color: '#c4bcf5' },
+  'Bloomberg Green':      { background: '#0a2a1a', color: '#4dff9a' },
+  'Energy Monitor':       { background: '#0d2a1f', color: '#4dffaa' },
+  'PR Newswire M&A':      { background: '#1a0a2a', color: '#d4a8ff' },
 }
 function srcStyle(src) { return SRC_COLORS[src] || { background: '#1e1e1e', color: '#aaa' } }
 
@@ -103,7 +126,7 @@ function Section({ label, text }) {
   return (
     <div style={{ borderTop: '0.5px solid #222', paddingTop: 13, marginBottom: 14 }}>
       <div style={sl2}>{label}</div>
-      <div style={{ fontSize: 12, color: '#bbb', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{text}</div>
+      <div style={{ fontSize: 12, color: '#bbb', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{stripMarkdown(text)}</div>
     </div>
   )
 }
@@ -144,7 +167,7 @@ function NewsModal({ record, onClose, onToggleSave, mobile }) {
             {insights.map((ins, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, paddingBottom: 8, marginBottom: 8, borderBottom: i < insights.length - 1 ? '0.5px solid #1e1e1e' : 'none' }}>
                 <span style={{ color: '#1D9E75', fontWeight: 500, flexShrink: 0 }}>→</span>
-                <span style={{ fontSize: 12, color: '#bbb', lineHeight: 1.65 }}>{ins}</span>
+                <span style={{ fontSize: 12, color: '#bbb', lineHeight: 1.65 }}>{stripMarkdown(ins)}</span>
               </div>
             ))}
           </div>
@@ -218,7 +241,7 @@ export default function App() {
   useEffect(() => {
     fetchAll().then(r => { setRecords(r); setLoading(false) }).catch(() => setLoading(false))
     fetchEarnings().then(r => { setEarnings(r); setEarningsLoading(false) }).catch(() => setEarningsLoading(false))
-    fetchEarningsCalendar().then(r => setCalendar(r)).catch(() => {})
+    fetchEarningsCalendar().then(r => setCalendar(r)).catch(() => setCalendar([]))
     const handleResize = () => setMobile(isMobile())
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
@@ -264,6 +287,13 @@ export default function App() {
       (f['Company'] || '').toLowerCase().includes(earningsSearch.toLowerCase()) ||
       (f['Ticker'] || '').toLowerCase().includes(earningsSearch.toLowerCase()) ||
       (f['Filing Type'] || '').toLowerCase().includes(earningsSearch.toLowerCase())
+  })
+
+  // Only show upcoming calendar entries (today or future)
+  const today = new Date(); today.setHours(0,0,0,0)
+  const upcomingCalendar = calendar.filter(r => {
+    const d = r.fields['Earnings Date'] ? new Date(r.fields['Earnings Date']) : null
+    return d && d >= today
   })
 
   const StatCards = () => (
@@ -411,7 +441,7 @@ export default function App() {
                     <span style={{ fontSize: 10, color: '#555', marginLeft: 'auto' }}>{formatDate(f['Published Date'])}</span>
                   </div>
                   <div style={{ fontSize: mobile ? 14 : 13, fontWeight: 500, color: '#f0f0f0', lineHeight: 1.4, marginBottom: 5 }}>{f['Title'] || 'Untitled'}</div>
-                  <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{f['AI Summary'] || ''}</div>
+                  <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{stripMarkdown(f['AI Summary'] || '')}</div>
                   {(f['Topics'] || []).length > 0 && (
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
                       {(f['Topics'] || []).slice(0, mobile ? 3 : 5).map(t => (
@@ -427,38 +457,30 @@ export default function App() {
       )}
 
       {mainTab === 'earnings' && (
-        <div style={{ maxWidth: 1000, margin: '0 auto', padding: mobile ? '12px' : '20px 16px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: mobile ? '12px' : '20px 16px' }}>
 
-          {/* Upcoming Earnings Calendar */}
-          {calendar.length > 0 && (
+          {/* Upcoming earnings calendar - only shows future dates */}
+          {upcomingCalendar.length > 0 && (
             <div style={{ marginBottom: 28 }}>
-              <div style={{ fontSize: 11, fontWeight: 500, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
-                Upcoming Earnings — Q1 2026
+              <div style={{ fontSize: 9, fontWeight: 500, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>
+                Upcoming Earnings — {upcomingCalendar[0]?.fields['Quarter'] || 'Q1 2026'}
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {calendar.map(r => {
+              <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+                {upcomingCalendar.map(r => {
                   const f = r.fields
-                  const date = f['Earnings Date'] ? new Date(f['Earnings Date'] + 'T12:00:00') : null
-                  const today = new Date()
-                  today.setHours(0,0,0,0)
-                  const isToday = date && date.toDateString() === today.toDateString()
-                  const isPast = date && date < today
+                  const earningsDate = f['Earnings Date'] ? new Date(f['Earnings Date']) : null
+                  const isToday = earningsDate && earningsDate.toDateString() === new Date().toDateString()
                   return (
                     <div key={r.id} style={{
-                      background: isPast ? '#0f0f0f' : isToday ? '#0a2218' : '#111',
-border: `0.5px solid ${isToday ? '#1D9E75' : isPast ? '#1e1e1e' : '#2a2a2a'}`,
-borderRadius: 8,
-padding: '7px 10px',
-width: mobile ? 'calc(33% - 6px)' : 130,
-flex: '0 0 auto',
-opacity: isPast ? 0.5 : 1,
+                      background: isToday ? '#0a2218' : '#111',
+                      border: `0.5px solid ${isToday ? '#1D9E75' : '#2a2a2a'}`,
+                      borderRadius: 8,
+                      padding: '10px 12px'
                     }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: '#f0f0f0', marginBottom: 2 }}>{f['Company']}</div>
-<div style={{ fontSize: 9, color: '#888', marginBottom: 4 }}>{f['Ticker']}</div>
-<div style={{ fontSize: 10, color: isToday ? '#6ddbb0' : isPast ? '#555' : '#aaa', fontWeight: isToday ? 600 : 400 }}>
-                        {date ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
-                        {isToday && <span style={{ marginLeft: 5, fontSize: 9, background: '#1D9E75', color: '#000', borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>TODAY</span>}
-                        {isPast && <span style={{ marginLeft: 5, fontSize: 9, color: '#555' }}>reported</span>}
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#f0f0f0', marginBottom: 2 }}>{f['Company']}</div>
+                      <div style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>{f['Ticker']}</div>
+                      <div style={{ fontSize: 11, color: isToday ? '#6ddbb0' : '#aaa' }}>
+                        {isToday ? '📅 Today' : formatEarningsDate(f['Earnings Date'])}
                       </div>
                     </div>
                   )
@@ -467,12 +489,13 @@ opacity: isPast ? 0.5 : 1,
             </div>
           )}
 
-          {/* Earnings Analysis */}
-          <div style={{ fontSize: 11, fontWeight: 500, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+          {/* Earnings analysis section */}
+          <div style={{ fontSize: 9, fontWeight: 500, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>
             Earnings Analysis
           </div>
           <input style={{ background: '#161616', border: '0.5px solid #2a2a2a', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#fff', width: '100%', outline: 'none', marginBottom: 16 }}
             placeholder="Search by company, ticker or quarter…" value={earningsSearch} onChange={e => setEarningsSearch(e.target.value)} />
+
           {earningsLoading ? (
             <div style={{ color: '#555', textAlign: 'center', padding: '60px 0', fontSize: 13 }}>Loading earnings…</div>
           ) : filteredEarnings.length === 0 ? (
@@ -495,7 +518,7 @@ opacity: isPast ? 0.5 : 1,
                       <div style={{ fontSize: 11, color: '#555', flexShrink: 0 }}>{f['Filing Date']}</div>
                     </div>
                     <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {f['Summary'] || f['Key Performance Highlights'] || ''}
+                      {stripMarkdown(f['Summary'] || f['Key Performance Highlights'] || '')}
                     </div>
                   </div>
                 )
