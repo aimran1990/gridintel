@@ -289,7 +289,6 @@ export default function App() {
       (f['Filing Type'] || '').toLowerCase().includes(earningsSearch.toLowerCase())
   })
 
-  // Only show upcoming calendar entries (today or future)
   const today = new Date(); today.setHours(0,0,0,0)
   const upcomingCalendar = calendar.filter(r => {
     const d = r.fields['Earnings Date'] ? new Date(r.fields['Earnings Date']) : null
@@ -371,7 +370,6 @@ export default function App() {
   return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
-      {/* TOPBAR */}
       <div style={{ background: '#0f0f0f', borderBottom: '0.5px solid #2a2a2a', position: 'sticky', top: 0, zIndex: 20 }}>
         <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -459,13 +457,12 @@ export default function App() {
       {mainTab === 'earnings' && (
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: mobile ? '12px' : '20px 16px' }}>
 
-          {/* Upcoming earnings calendar - only shows future dates */}
           {upcomingCalendar.length > 0 && (
-            <div style={{ marginBottom: 28 }}>
-              <div style={{ fontSize: 9, fontWeight: 500, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>
+            <div style={{ marginBottom: 24 }}>
+              <div style={sl1}>
                 Upcoming Earnings — {upcomingCalendar[0]?.fields['Quarter'] || 'Q1 2026'}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {upcomingCalendar.map(r => {
                   const f = r.fields
                   const earningsDate = f['Earnings Date'] ? new Date(f['Earnings Date']) : null
@@ -474,14 +471,16 @@ export default function App() {
                     <div key={r.id} style={{
                       background: isToday ? '#0a2218' : '#111',
                       border: `0.5px solid ${isToday ? '#1D9E75' : '#2a2a2a'}`,
-                      borderRadius: 8,
-                      padding: '10px 12px'
+                      borderRadius: 6,
+                      padding: '5px 10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8
                     }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#f0f0f0', marginBottom: 2 }}>{f['Company']}</div>
-                      <div style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>{f['Ticker']}</div>
-                      <div style={{ fontSize: 11, color: isToday ? '#6ddbb0' : '#aaa' }}>
-                        {isToday ? '📅 Today' : formatEarningsDate(f['Earnings Date'])}
-                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#f0f0f0' }}>{f['Ticker']}</span>
+                      <span style={{ fontSize: 10, color: isToday ? '#6ddbb0' : '#555' }}>
+                        {isToday ? 'Today' : formatEarningsDate(f['Earnings Date'])}
+                      </span>
                     </div>
                   )
                 })}
@@ -489,11 +488,8 @@ export default function App() {
             </div>
           )}
 
-          {/* Earnings analysis section */}
-          <div style={{ fontSize: 9, fontWeight: 500, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>
-            Earnings Analysis
-          </div>
-          <input style={{ background: '#161616', border: '0.5px solid #2a2a2a', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#fff', width: '100%', outline: 'none', marginBottom: 16 }}
+          <div style={sl1}>Earnings Analysis</div>
+          <input style={{ background: '#161616', border: '0.5px solid #2a2a2a', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#fff', width: '100%', outline: 'none', marginBottom: 16, marginTop: 8 }}
             placeholder="Search by company, ticker or quarter…" value={earningsSearch} onChange={e => setEarningsSearch(e.target.value)} />
 
           {earningsLoading ? (
