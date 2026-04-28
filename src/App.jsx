@@ -27,6 +27,13 @@ async function fetchEarnings() {
   return records
 }
 
+async function fetchEarningsCalendar() {
+  const url = `https://api.airtable.com/v0/${BASE}/Earnings%20Calendar?pageSize=100&sort[0][field]=Earnings%20Date&sort[0][direction]=asc`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` } })
+  const data = await res.json()
+  return data.records || []
+}
+
 async function toggleSaved(id, current) {
   await fetch(`https://api.airtable.com/v0/${BASE}/Feed%20Items/${id}`, {
     method: 'PATCH',
@@ -64,7 +71,7 @@ const SRC_COLORS = {
   'Canary Media':         { background: '#0a2218', color: '#6ddbb0' },
   'Norton Rose Currents': { background: '#2a1f00', color: '#ffc04d' },
   'RTO Insider':          { background: '#0d1f35', color: '#90c8ff' },
-  'Bloomberg Green': { background: '#0a2a1a', color: '#4dff9a' },
+  'Bloomberg Green':      { background: '#0a2a1a', color: '#4dff9a' },
   'Axios Energy':         { background: '#1e1a3a', color: '#c4bcf5' },
 }
 function srcStyle(src) { return SRC_COLORS[src] || { background: '#1e1e1e', color: '#aaa' } }
@@ -191,6 +198,7 @@ function EarningsModal({ record, onClose, mobile }) {
 export default function App() {
   const [records, setRecords] = useState([])
   const [earnings, setEarnings] = useState([])
+  const [calendar, setCalendar] = useState([])
   const [loading, setLoading] = useState(true)
   const [earningsLoading, setEarningsLoading] = useState(true)
   const [selected, setSelected] = useState(null)
@@ -209,6 +217,7 @@ export default function App() {
   useEffect(() => {
     fetchAll().then(r => { setRecords(r); setLoading(false) }).catch(() => setLoading(false))
     fetchEarnings().then(r => { setEarnings(r); setEarningsLoading(false) }).catch(() => setEarningsLoading(false))
+    fetchEarningsCalendar().then(r => setCalendar(r)).catch(() => {})
     const handleResize = () => setMobile(isMobile())
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
@@ -333,17 +342,12 @@ export default function App() {
 
       {/* TOPBAR */}
       <div style={{ background: '#0f0f0f', borderBottom: '0.5px solid #2a2a2a', position: 'sticky', top: 0, zIndex: 20 }}>
-
-        {/* Top row */}
         <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#1D9E75', display: 'inline-block' }} />
             GridIntel
           </div>
-
-          {/* Desktop tabs inline */}
           {!mobile && <TabSwitcher />}
-
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {mobile && mainTab === 'news' && (
               <button onClick={() => setShowFilters(!showFilters)}
@@ -356,8 +360,6 @@ export default function App() {
             </div>
           </div>
         </div>
-
-        {/* Mobile tabs on separate row */}
         {mobile && <TabSwitcher />}
       </div>
 
@@ -425,6 +427,49 @@ export default function App() {
 
       {mainTab === 'earnings' && (
         <div style={{ maxWidth: 1000, margin: '0 auto', padding: mobile ? '12px' : '20px 16px' }}>
+
+          {/* Upcoming Earnings Calendar */}
+          {calendar.length > 0 && (
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ fontSize: 11, fontWeight: 500, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+                Upcoming Earnings — Q1 2026
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {calendar.map(r => {
+                  const f = r.fields
+                  const date = f['Earnings Date'] ? new Date(f['Earnings Date'] + 'T12:00:00') : null
+                  const today = new Date()
+                  today.setHours(0,0,0,0)
+                  const isToday = date && date.toDateString() === today.toDateString()
+                  const isPast = date && date < today
+                  return (
+                    <div key={r.id} style={{
+                      background: isPast ? '#0f0f0f' : isToday ? '#0a2218' : '#111',
+                      border: `0.5px solid ${isToday ? '#1D9E75' : isPast ? '#1e1e1e' : '#2a2a2a'}`,
+                      borderRadius: 10,
+                      padding: '10px 14px',
+                      minWidth: mobile ? '42%' : 160,
+                      flex: '1 1 140px',
+                      opacity: isPast ? 0.5 : 1,
+                    }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#f0f0f0', marginBottom: 3 }}>{f['Company']}</div>
+                      <div style={{ fontSize: 10, color: '#888', marginBottom: 6 }}>{f['Ticker']}</div>
+                      <div style={{ fontSize: 11, color: isToday ? '#6ddbb0' : isPast ? '#555' : '#aaa', fontWeight: isToday ? 600 : 400 }}>
+                        {date ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                        {isToday && <span style={{ marginLeft: 5, fontSize: 9, background: '#1D9E75', color: '#000', borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>TODAY</span>}
+                        {isPast && <span style={{ marginLeft: 5, fontSize: 9, color: '#555' }}>reported</span>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Earnings Analysis */}
+          <div style={{ fontSize: 11, fontWeight: 500, color: '#666', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>
+            Earnings Analysis
+          </div>
           <input style={{ background: '#161616', border: '0.5px solid #2a2a2a', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#fff', width: '100%', outline: 'none', marginBottom: 16 }}
             placeholder="Search by company, ticker or quarter…" value={earningsSearch} onChange={e => setEarningsSearch(e.target.value)} />
           {earningsLoading ? (
