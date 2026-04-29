@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const TOKEN = import.meta.env.VITE_AIRTABLE_TOKEN
 const BASE = 'appku5LeL41UMhCJe'
@@ -100,22 +100,45 @@ const SRC_COLORS = {
 }
 function srcStyle(src) { return SRC_COLORS[src] || { background: '#1e1e1e', color: '#aaa' } }
 
-const DATE_RANGES = ['Today', '7 days', '14 days', '1 month', 'All time']
+const DATE_RANGES = ['Today', '7 days', '14 days', '1 month', 'All time', 'Custom']
 
-function getDateCutoff(range) {
+function getDateCutoff(range, customFrom, customTo) {
   const now = new Date()
-  if (range === 'Today') { const d = new Date(); d.setHours(0,0,0,0); return d }
-  if (range === '7 days') return new Date(now - 7*86400000)
-  if (range === '14 days') return new Date(now - 14*86400000)
-  if (range === '1 month') return new Date(now - 30*86400000)
-  return null
+  if (range === 'Today') { const d = new Date(); d.setHours(0,0,0,0); return { from: d, to: null } }
+  if (range === '7 days') return { from: new Date(now - 7*86400000), to: null }
+  if (range === '14 days') return { from: new Date(now - 14*86400000), to: null }
+  if (range === '1 month') return { from: new Date(now - 30*86400000), to: null }
+  if (range === 'Custom') return {
+    from: customFrom ? new Date(customFrom) : null,
+    to: customTo ? new Date(customTo + 'T23:59:59') : null
+  }
+  return { from: null, to: null }
 }
 
 const isMobile = () => window.innerWidth < 700
 
+// Multi-select toggle helper
+function toggleArr(arr, val) {
+  return arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]
+}
+
 function Chip({ label, active, count, onClick }) {
   return (
-    <div onClick={onClick} style={{ fontSize: 11, color: active ? '#fff' : '#aaa', padding: '4px 7px', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 1, cursor: 'pointer', gap: 4, userSelect: 'none', background: active ? '#1e1e1e' : 'none' }}>
+    <div onClick={onClick} style={{
+      fontSize: 11,
+      color: active ? '#fff' : '#aaa',
+      padding: '4px 7px',
+      borderRadius: 6,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 1,
+      cursor: 'pointer',
+      gap: 4,
+      userSelect: 'none',
+      background: active ? '#1e1e1e' : 'none',
+      border: active ? '0.5px solid #444' : '0.5px solid transparent'
+    }}>
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140 }}>{label}</span>
       {count !== undefined && <span style={{ fontSize: 10, color: '#555', flexShrink: 0 }}>{count}</span>}
     </div>
@@ -229,10 +252,16 @@ export default function App() {
   const [selectedEarnings, setSelectedEarnings] = useState(null)
   const [search, setSearch] = useState('')
   const [earningsSearch, setEarningsSearch] = useState('')
-  const [filterImp, setFilterImp] = useState('All')
-  const [filterSrc, setFilterSrc] = useState('All')
-  const [filterTopic, setFilterTopic] = useState('All')
+
+  // Multi-select filter state — arrays now
+  const [filterImps, setFilterImps] = useState([])
+  const [filterSrcs, setFilterSrcs] = useState([])
+  const [filterTopics, setFilterTopics] = useState([])
+
   const [dateRange, setDateRange] = useState('All time')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+
   const [tab, setTab] = useState('all')
   const [mainTab, setMainTab] = useState('news')
   const [showFilters, setShowFilters] = useState(false)
@@ -253,10 +282,14 @@ export default function App() {
     if (selected?.id === id) setSelected(prev => ({ ...prev, fields: { ...prev.fields, Saved: !current } }))
   }
 
-  const cutoff = getDateCutoff(dateRange)
+  const { from: cutoffFrom, to: cutoffTo } = getDateCutoff(dateRange, customFrom, customTo)
+
   const dateFiltered = records.filter(r => {
     const pub = r.fields['Published Date'] ? new Date(r.fields['Published Date']) : null
-    return !cutoff || (pub && pub >= cutoff)
+    if (!pub) return false
+    if (cutoffFrom && pub < cutoffFrom) return false
+    if (cutoffTo && pub > cutoffTo) return false
+    return true
   })
 
   const savedCount = records.filter(r => r.fields['Saved']).length
@@ -264,21 +297,23 @@ export default function App() {
   const todayStart = new Date(); todayStart.setHours(0,0,0,0)
   const todayCount = dateFiltered.filter(r => r.fields['Published Date'] && new Date(r.fields['Published Date']) >= todayStart).length
 
-  const sources = ['All', ...new Set(records.map(r => r.fields['Source']).filter(Boolean))]
-  const allTopics = ['All', ...new Set(records.flatMap(r => r.fields['Topics'] || []))]
+  const sources = [...new Set(records.map(r => r.fields['Source']).filter(Boolean))]
+  const allTopics = [...new Set(records.flatMap(r => r.fields['Topics'] || []))]
+
+  const activeFilterCount = filterImps.length + filterSrcs.length + filterTopics.length +
+    (dateRange !== 'All time' ? 1 : 0)
 
   const base = tab === 'saved' ? records.filter(r => r.fields['Saved']) : records
   const filtered = base.filter(r => {
     const f = r.fields
     const pub = f['Published Date'] ? new Date(f['Published Date']) : null
-    return (
-      (filterImp === 'All' || f['Importance'] === filterImp) &&
-      (filterSrc === 'All' || f['Source'] === filterSrc) &&
-      (filterTopic === 'All' || (f['Topics'] || []).includes(filterTopic)) &&
-      (!cutoff || (pub && pub >= cutoff)) &&
-      (!search || (f['Title'] || '').toLowerCase().includes(search.toLowerCase()) ||
-        (f['AI Summary'] || '').toLowerCase().includes(search.toLowerCase()))
-    )
+    const passDate = (!cutoffFrom || (pub && pub >= cutoffFrom)) && (!cutoffTo || (pub && pub <= cutoffTo))
+    const passImp = filterImps.length === 0 || filterImps.includes(f['Importance'])
+    const passSrc = filterSrcs.length === 0 || filterSrcs.includes(f['Source'])
+    const passTopic = filterTopics.length === 0 || (f['Topics'] || []).some(t => filterTopics.includes(t))
+    const passSearch = !search || (f['Title'] || '').toLowerCase().includes(search.toLowerCase()) ||
+      (f['AI Summary'] || '').toLowerCase().includes(search.toLowerCase())
+    return passDate && passImp && passSrc && passTopic && passSearch
   })
 
   const filteredEarnings = earnings.filter(r => {
@@ -295,6 +330,15 @@ export default function App() {
     return d && d >= today
   })
 
+  const clearFilters = () => {
+    setFilterImps([])
+    setFilterSrcs([])
+    setFilterTopics([])
+    setDateRange('All time')
+    setCustomFrom('')
+    setCustomTo('')
+  }
+
   const StatCards = () => (
     <div style={{ display: 'flex', gap: 5, marginBottom: 14 }}>
       {[['Total', dateFiltered.length], ['High', highCount], ['Today', todayCount]].map(([l, n]) => (
@@ -306,12 +350,26 @@ export default function App() {
     </div>
   )
 
-  const Sidebar = () => (
-    <div style={{ padding: mobile ? '12px 16px' : '14px 10px' }}>
-      {!mobile && <StatCards />}
-      <div style={{ marginBottom: 14 }}>
+  const FilterPanel = ({ onClose }) => (
+    <div style={{ padding: '14px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>Filters</span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {activeFilterCount > 0 && (
+            <button onClick={clearFilters} style={{ fontSize: 10, color: '#ff6b6b', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              Clear all
+            </button>
+          )}
+          {onClose && (
+            <button onClick={onClose} style={{ fontSize: 12, color: '#aaa', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
+          )}
+        </div>
+      </div>
+
+      {/* Date range */}
+      <div style={{ marginBottom: 16 }}>
         <div style={sl1}>Date range</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
           {DATE_RANGES.map(r => (
             <div key={r} onClick={() => setDateRange(r)}
               style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', border: '0.5px solid', borderColor: dateRange === r ? '#1D9E75' : '#2a2a2a', background: dateRange === r ? '#0a2218' : '#161616', color: dateRange === r ? '#6ddbb0' : '#aaa' }}>
@@ -319,24 +377,50 @@ export default function App() {
             </div>
           ))}
         </div>
+        {dateRange === 'Custom' && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 9, color: '#666', marginBottom: 4 }}>FROM</div>
+              <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                style={{ width: '100%', background: '#161616', border: '0.5px solid #2a2a2a', borderRadius: 6, padding: '5px 8px', fontSize: 11, color: '#fff', outline: 'none', colorScheme: 'dark' }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 9, color: '#666', marginBottom: 4 }}>TO</div>
+              <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                style={{ width: '100%', background: '#161616', border: '0.5px solid #2a2a2a', borderRadius: 6, padding: '5px 8px', fontSize: 11, color: '#fff', outline: 'none', colorScheme: 'dark' }} />
+            </div>
+          </div>
+        )}
       </div>
-      <div style={sl1}>Importance</div>
-      {['All', 'High', 'Medium', 'Low'].map(imp => (
-        <Chip key={imp} label={imp} active={filterImp === imp}
-          count={imp === 'All' ? dateFiltered.length : dateFiltered.filter(r => r.fields['Importance'] === imp).length}
-          onClick={() => setFilterImp(imp)} />
-      ))}
-      <div style={{ ...sl1, marginTop: 14 }}>Source</div>
-      {sources.map(src => (
-        <Chip key={src} label={src} active={filterSrc === src}
-          count={src === 'All' ? dateFiltered.length : dateFiltered.filter(r => r.fields['Source'] === src).length}
-          onClick={() => { setFilterSrc(src); if (mobile) setShowFilters(false) }} />
-      ))}
-      <div style={{ ...sl1, marginTop: 14 }}>Topic</div>
-      {allTopics.slice(0, 20).map(t => (
-        <Chip key={t} label={t} active={filterTopic === t}
-          onClick={() => { setFilterTopic(t); if (mobile) setShowFilters(false) }} />
-      ))}
+
+      {/* Importance — multi-select */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={sl1}>Importance {filterImps.length > 0 && <span style={{ color: '#1D9E75' }}>({filterImps.length})</span>}</div>
+        {['High', 'Medium', 'Low'].map(imp => (
+          <Chip key={imp} label={imp} active={filterImps.includes(imp)}
+            count={dateFiltered.filter(r => r.fields['Importance'] === imp).length}
+            onClick={() => setFilterImps(prev => toggleArr(prev, imp))} />
+        ))}
+      </div>
+
+      {/* Source — multi-select */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={sl1}>Source {filterSrcs.length > 0 && <span style={{ color: '#1D9E75' }}>({filterSrcs.length})</span>}</div>
+        {sources.map(src => (
+          <Chip key={src} label={src} active={filterSrcs.includes(src)}
+            count={dateFiltered.filter(r => r.fields['Source'] === src).length}
+            onClick={() => setFilterSrcs(prev => toggleArr(prev, src))} />
+        ))}
+      </div>
+
+      {/* Topic — multi-select */}
+      <div>
+        <div style={sl1}>Topic {filterTopics.length > 0 && <span style={{ color: '#1D9E75' }}>({filterTopics.length})</span>}</div>
+        {allTopics.slice(0, 30).map(t => (
+          <Chip key={t} label={t} active={filterTopics.includes(t)}
+            onClick={() => setFilterTopics(prev => toggleArr(prev, t))} />
+        ))}
+      </div>
     </div>
   )
 
@@ -370,6 +454,7 @@ export default function App() {
   return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
+      {/* TOPBAR */}
       <div style={{ background: '#0f0f0f', borderBottom: '0.5px solid #2a2a2a', position: 'sticky', top: 0, zIndex: 20 }}>
         <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -380,42 +465,53 @@ export default function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {mobile && mainTab === 'news' && (
               <button onClick={() => setShowFilters(!showFilters)}
-                style={{ background: showFilters ? '#1e1e1e' : 'none', border: '0.5px solid #2a2a2a', borderRadius: 6, color: '#aaa', fontSize: 11, padding: '5px 10px', cursor: 'pointer' }}>
-                {showFilters ? '✕' : '⚙ Filters'}
+                style={{ background: showFilters ? '#1e1e1e' : 'none', border: `0.5px solid ${activeFilterCount > 0 ? '#1D9E75' : '#2a2a2a'}`, borderRadius: 6, color: activeFilterCount > 0 ? '#6ddbb0' : '#aaa', fontSize: 11, padding: '5px 10px', cursor: 'pointer' }}>
+                {showFilters ? '✕ Close' : `⚙ Filters${activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}`}
               </button>
             )}
             <div style={{ fontSize: 11, color: '#444' }}>
-              {mainTab === 'news' ? `${dateFiltered.length} articles` : `${earnings.length} filings`}
+              {mainTab === 'news' ? `${filtered.length} articles` : `${earnings.length} filings`}
             </div>
           </div>
         </div>
         {mobile && <TabSwitcher />}
       </div>
 
+      {/* Mobile filter — fixed overlay so it appears wherever user is */}
       {mainTab === 'news' && mobile && showFilters && (
-        <div style={{ background: '#0f0f0f', borderBottom: '0.5px solid #2a2a2a', maxHeight: '75vh', overflowY: 'auto' }}>
-          <Sidebar />
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end' }}
+          onClick={() => setShowFilters(false)}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ width: '100%', background: '#0f0f0f', borderTop: '0.5px solid #2a2a2a', borderRadius: '14px 14px 0 0', maxHeight: '80vh', overflowY: 'auto' }}>
+            <FilterPanel onClose={() => setShowFilters(false)} />
+          </div>
         </div>
       )}
 
       {mainTab === 'news' && (
         <div style={{ display: 'flex', maxWidth: 1200, margin: '0 auto' }}>
+          {/* Desktop sidebar — sticky */}
           {!mobile && (
-            <div style={{ width: 210, borderRight: '0.5px solid #2a2a2a', flexShrink: 0, position: 'sticky', top: 77, height: 'calc(100vh - 77px)', overflowY: 'auto' }}>
-              <Sidebar />
+            <div style={{ width: 220, borderRight: '0.5px solid #2a2a2a', flexShrink: 0, position: 'sticky', top: 77, height: 'calc(100vh - 77px)', overflowY: 'auto' }}>
+              <FilterPanel />
             </div>
           )}
           <div style={{ flex: 1, padding: mobile ? '12px' : '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
             <input style={{ background: '#161616', border: '0.5px solid #2a2a2a', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#fff', width: '100%', outline: 'none' }}
               placeholder="Search articles…" value={search} onChange={e => setSearch(e.target.value)} />
             {mobile && <StatCards />}
-            <div style={{ display: 'flex', gap: 2 }}>
+            <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
               {['all', 'saved'].map(t => (
                 <div key={t} onClick={() => setTab(t)}
                   style={{ fontSize: 11, padding: '5px 12px', borderRadius: 6, cursor: 'pointer', color: tab === t ? '#fff' : '#888', background: tab === t ? '#1e1e1e' : 'none', border: `0.5px solid ${tab === t ? '#2a2a2a' : 'transparent'}` }}>
-                  {t === 'all' ? 'All articles' : `Saved${savedCount > 0 ? ` (${savedCount})` : ''}`}
+                  {t === 'all' ? `All (${filtered.length})` : `Saved${savedCount > 0 ? ` (${savedCount})` : ''}`}
                 </div>
               ))}
+              {activeFilterCount > 0 && (
+                <button onClick={clearFilters} style={{ marginLeft: 'auto', fontSize: 10, color: '#ff6b6b', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>
+                  Clear filters ✕
+                </button>
+              )}
             </div>
             {loading ? (
               <div style={{ color: '#555', textAlign: 'center', padding: '60px 0', fontSize: 13 }}>Loading articles…</div>
@@ -443,7 +539,7 @@ export default function App() {
                   {(f['Topics'] || []).length > 0 && (
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
                       {(f['Topics'] || []).slice(0, mobile ? 3 : 5).map(t => (
-                        <span key={t} style={{ fontSize: 9, padding: '2px 7px', borderRadius: 20, background: '#1e1e1e', color: '#999', border: '0.5px solid #2a2a2a' }}>{t}</span>
+                        <span key={t} style={{ fontSize: 9, padding: '2px 7px', borderRadius: 20, background: filterTopics.includes(t) ? '#0a2218' : '#1e1e1e', color: filterTopics.includes(t) ? '#6ddbb0' : '#999', border: `0.5px solid ${filterTopics.includes(t) ? '#1D9E75' : '#2a2a2a'}` }}>{t}</span>
                       ))}
                     </div>
                   )}
@@ -456,27 +552,16 @@ export default function App() {
 
       {mainTab === 'earnings' && (
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: mobile ? '12px' : '20px 16px' }}>
-
           {upcomingCalendar.length > 0 && (
             <div style={{ marginBottom: 24 }}>
-              <div style={sl1}>
-                Upcoming Earnings — {upcomingCalendar[0]?.fields['Quarter'] || 'Q1 2026'}
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <div style={sl1}>Upcoming Earnings — {upcomingCalendar[0]?.fields['Quarter'] || 'Q1 2026'}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                 {upcomingCalendar.map(r => {
                   const f = r.fields
                   const earningsDate = f['Earnings Date'] ? new Date(f['Earnings Date']) : null
                   const isToday = earningsDate && earningsDate.toDateString() === new Date().toDateString()
                   return (
-                    <div key={r.id} style={{
-                      background: isToday ? '#0a2218' : '#111',
-                      border: `0.5px solid ${isToday ? '#1D9E75' : '#2a2a2a'}`,
-                      borderRadius: 6,
-                      padding: '5px 10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8
-                    }}>
+                    <div key={r.id} style={{ background: isToday ? '#0a2218' : '#111', border: `0.5px solid ${isToday ? '#1D9E75' : '#2a2a2a'}`, borderRadius: 6, padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 11, fontWeight: 600, color: '#f0f0f0' }}>{f['Ticker']}</span>
                       <span style={{ fontSize: 10, color: isToday ? '#6ddbb0' : '#555' }}>
                         {isToday ? 'Today' : formatEarningsDate(f['Earnings Date'])}
