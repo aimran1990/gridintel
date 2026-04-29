@@ -58,8 +58,10 @@ function formatDate(str) {
 
 function formatEarningsDate(str) {
   if (!str) return ''
-  const d = new Date(str)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  // Parse as local date to avoid timezone shift
+  const [y, m, d] = str.split('-')
+  const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d))
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 function stripMarkdown(text) {
@@ -69,6 +71,11 @@ function stripMarkdown(text) {
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\*(.*?)\*/g, '$1')
     .replace(/^[-*]\s+/gm, '• ')
+    .replace(/^SUMMARY[:\s]*/m, '')
+    .replace(/^KEY PERFORMANCE HIGHLIGHTS[:\s]*/m, '')
+    .replace(/^OUTLOOK[:\s]*/m, '')
+    .replace(/^WHY IT MATTERS[:\s]*/m, '')
+    .replace(/---+/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
@@ -117,7 +124,6 @@ function getDateCutoff(range, customFrom, customTo) {
 
 const isMobile = () => window.innerWidth < 700
 
-// Multi-select toggle helper
 function toggleArr(arr, val) {
   return arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]
 }
@@ -252,20 +258,19 @@ export default function App() {
   const [selectedEarnings, setSelectedEarnings] = useState(null)
   const [search, setSearch] = useState('')
   const [earningsSearch, setEarningsSearch] = useState('')
-
-  // Multi-select filter state — arrays now
   const [filterImps, setFilterImps] = useState([])
   const [filterSrcs, setFilterSrcs] = useState([])
   const [filterTopics, setFilterTopics] = useState([])
-
   const [dateRange, setDateRange] = useState('All time')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
-
   const [tab, setTab] = useState('all')
   const [mainTab, setMainTab] = useState('news')
   const [showFilters, setShowFilters] = useState(false)
   const [mobile, setMobile] = useState(isMobile())
+
+  // Local date string in YYYY-MM-DD — no timezone shift
+  const todayStr = new Date().toLocaleDateString('en-CA')
 
   useEffect(() => {
     fetchAll().then(r => { setRecords(r); setLoading(false) }).catch(() => setLoading(false))
@@ -324,10 +329,10 @@ export default function App() {
       (f['Filing Type'] || '').toLowerCase().includes(earningsSearch.toLowerCase())
   })
 
-  const today = new Date(); today.setHours(0,0,0,0)
+  // Compare date strings directly — no timezone issues
   const upcomingCalendar = calendar.filter(r => {
-    const d = r.fields['Earnings Date'] ? new Date(r.fields['Earnings Date']) : null
-    return d && d >= today
+    const d = r.fields['Earnings Date']
+    return d && d >= todayStr
   })
 
   const clearFilters = () => {
@@ -366,7 +371,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Date range */}
       <div style={{ marginBottom: 16 }}>
         <div style={sl1}>Date range</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
@@ -393,7 +397,6 @@ export default function App() {
         )}
       </div>
 
-      {/* Importance — multi-select */}
       <div style={{ marginBottom: 16 }}>
         <div style={sl1}>Importance {filterImps.length > 0 && <span style={{ color: '#1D9E75' }}>({filterImps.length})</span>}</div>
         {['High', 'Medium', 'Low'].map(imp => (
@@ -403,7 +406,6 @@ export default function App() {
         ))}
       </div>
 
-      {/* Source — multi-select */}
       <div style={{ marginBottom: 16 }}>
         <div style={sl1}>Source {filterSrcs.length > 0 && <span style={{ color: '#1D9E75' }}>({filterSrcs.length})</span>}</div>
         {sources.map(src => (
@@ -413,7 +415,6 @@ export default function App() {
         ))}
       </div>
 
-      {/* Topic — multi-select */}
       <div>
         <div style={sl1}>Topic {filterTopics.length > 0 && <span style={{ color: '#1D9E75' }}>({filterTopics.length})</span>}</div>
         {allTopics.slice(0, 30).map(t => (
@@ -454,7 +455,6 @@ export default function App() {
   return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
-      {/* TOPBAR */}
       <div style={{ background: '#0f0f0f', borderBottom: '0.5px solid #2a2a2a', position: 'sticky', top: 0, zIndex: 20 }}>
         <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -477,7 +477,6 @@ export default function App() {
         {mobile && <TabSwitcher />}
       </div>
 
-      {/* Mobile filter — fixed overlay so it appears wherever user is */}
       {mainTab === 'news' && mobile && showFilters && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'flex-end' }}
           onClick={() => setShowFilters(false)}>
@@ -490,7 +489,6 @@ export default function App() {
 
       {mainTab === 'news' && (
         <div style={{ display: 'flex', maxWidth: 1200, margin: '0 auto' }}>
-          {/* Desktop sidebar — sticky */}
           {!mobile && (
             <div style={{ width: 220, borderRight: '0.5px solid #2a2a2a', flexShrink: 0, position: 'sticky', top: 77, height: 'calc(100vh - 77px)', overflowY: 'auto' }}>
               <FilterPanel />
@@ -558,10 +556,17 @@ export default function App() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                 {upcomingCalendar.map(r => {
                   const f = r.fields
-                  const earningsDate = f['Earnings Date'] ? new Date(f['Earnings Date']) : null
-                  const isToday = earningsDate && earningsDate.toDateString() === new Date().toDateString()
+                  const isToday = f['Earnings Date'] === todayStr
                   return (
-                    <div key={r.id} style={{ background: isToday ? '#0a2218' : '#111', border: `0.5px solid ${isToday ? '#1D9E75' : '#2a2a2a'}`, borderRadius: 6, padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div key={r.id} style={{
+                      background: isToday ? '#0a2218' : '#111',
+                      border: `0.5px solid ${isToday ? '#1D9E75' : '#2a2a2a'}`,
+                      borderRadius: 6,
+                      padding: '5px 10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8
+                    }}>
                       <span style={{ fontSize: 11, fontWeight: 600, color: '#f0f0f0' }}>{f['Ticker']}</span>
                       <span style={{ fontSize: 10, color: isToday ? '#6ddbb0' : '#555' }}>
                         {isToday ? 'Today' : formatEarningsDate(f['Earnings Date'])}
