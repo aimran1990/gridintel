@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 
 const TOKEN = import.meta.env.VITE_AIRTABLE_TOKEN
 const BASE = 'appku5LeL41UMhCJe'
@@ -616,6 +617,7 @@ export default function App() {
 
       {selected && <NewsModal record={selected} onClose={() => setSelected(null)} onToggleSave={handleToggleSave} mobile={mobile} />}
       {selectedEarnings && <EarningsModal record={selectedEarnings} onClose={() => setSelectedEarnings(null)} mobile={mobile} />}
+      <Analytics />
     </div>
   )
 }
